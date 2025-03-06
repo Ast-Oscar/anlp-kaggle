@@ -1,0 +1,103 @@
+% This must be in the first 5 lines to tell arXiv to use pdfLaTeX, which is strongly recommended.
+\pdfoutput=1
+% In particular, the hyperref package requires pdfLaTeX in order to break URLs across lines.
+
+\documentclass[11pt]{article}
+
+% Remove the "review" option to generate the final version.
+\usepackage[review]{EMNLP2023}
+
+% Standard package includes
+\usepackage{times}
+\usepackage{latexsym}
+
+% For proper rendering and hyphenation of words containing Latin characters (including in bib files)
+\usepackage[T1]{fontenc}
+% For Vietnamese characters
+% \usepackage[T5]{fontenc}
+% See https://www.latex-project.org/help/documentation/encguide.pdf for other character sets
+
+% This assumes your files are encoded as UTF8
+\usepackage[utf8]{inputenc}
+
+% This is not strictly necessary, and may be commented out.
+% However, it will improve the layout of the manuscript,
+% and will typically save some space.
+\usepackage{microtype}
+
+% This is also not strictly necessary, and may be commented out.
+% However, it will improve the aesthetics of text in
+% the typewriter font.
+\usepackage{inconsolata}
+
+\setlength\titlebox{5cm}
+
+\title{Hybrid Language Identification using DistilBERT, FastText, and N-gram Filtering}
+
+\author{Oscar Pastural, Louis Gauthier, Clément Florval\\
+CentraleSupélec, Université Paris-Saclay\\
+}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+This work presents a hybrid solution for automatic language identification that combines fine-tuned DistilBERT, the open-source \textit{cis-lmu/glotlid} FastText model, and an innovative n-gram filtering mechanism. Our approach, designed for a Kaggle competition, achieves a final ensemble accuracy of 88.5\% by averaging the probabilities from DistilBERT and FastText and applying a trigram-based filter. We also explored alternative ensemble strategies and experimented with large language models (LLMs) via API; however, due to practical constraints and inefficiencies in local testing, only the open-source models were used.
+\end{abstract}
+
+\section{Introduction}
+Automatic language identification is a crucial component in multilingual information processing, impacting applications from digital content moderation to translation. Although transformer-based models like DistilBERT have achieved notable success, distinguishing between closely related languages remains challenging, especially for short or noisy texts. Traditional statistical methods (e.g., FastText) provide strong baselines but often lack the necessary contextual depth.
+
+Our work integrates the strengths of deep contextual embeddings and efficient statistical models. In addition, we initially explored leveraging state-of-the-art large language models (LLMs) via OpenAI’s GPT-4 API to label samples. While GPT-4 performed well in preliminary tests, attempts to replicate these results locally using models such as DeepSeek R1 Distilled Qwen 1.5B, Qwen 2.5 1.5B, and Aya-101 proved unsatisfactory due to poor performance, slow inference, and limited language coverage. Consequently, we focused on an open-source pipeline that remains both effective and efficient.
+
+\section{Solution}
+Our solution comprises three main components:
+
+\subsection{DistilBERT Classifier}
+We fine-tuned a multilingual DistilBERT model (\textit{distilbert-base-multilingual-cased}) on the provided dataset. Training was conducted on Google Colab using A100 GPUs, with each epoch taking roughly 30 minutes. Over 5 epochs (a total of 2 hours and 30 minutes), the model learned to output probability distributions over language labels.
+
+\subsection{FastText Predictions}
+To complement DistilBERT, we employed the \textit{cis-lmu/glotlid} FastText model. Owing to its training on over 2,000 languages, FastText was expected to help with languages underrepresented in our training data. We also attempted a threshold-based strategy—switching to FastText predictions when DistilBERT's top probability fell below 0.67—but this approach only achieved 87.39\% accuracy, making it less effective than our ensemble.
+
+\subsection{N-gram Filtering}
+A key innovation in our method is the n-gram filtering mechanism. We constructed language-specific n-gram vocabularies (unigrams to 4-grams) from the training data. After extensive experimentation, we determined that requiring at least 30\% of trigrams to be present in a language's vocabulary provided the best trade-off: it reduced the candidate set by 53\% (leaving 47\% of candidates) while misfiltering only 1.8\% of samples. This filtering increased DistilBERT’s accuracy from 86.93\% to 87.85\%.
+
+\subsection{Ensemble Approaches}
+Our intuition was that FastText’s broad language coverage could compensate for cases where DistilBERT struggled. By averaging the probability outputs of DistilBERT and FastText and applying the n-gram filter, we achieved our best accuracy of 88.5\%. We further investigated a group-based selection strategy that used tuples of top predictions from both models to dynamically choose the best candidate; however, this method yielded only marginal gains (from 87.46\% to 87.82\%), confirming that simple averaging with robust filtering was most effective.
+
+\section{Results and Analysis}
+Our experiments were structured into several key stages:
+
+\subsection{Baseline Performance}
+The fine-tuned DistilBERT model achieved a baseline accuracy of approximately 86.9\% on the evaluation set. Independently, FastText performed around 10\% lower but added valuable diversity to our predictions.
+
+\subsection{Impact of N-gram Filtering}
+The n-gram filter, with a 30\% trigram threshold, improved DistilBERT’s accuracy from 86.93\% to 87.85\% by reducing false positives while preserving the true labels in 98.2\% of cases.
+
+\subsection{Ensemble Approaches}
+Averaging the probabilities from DistilBERT and FastText, coupled with n-gram filtering, resulted in the best overall accuracy of 88.5\%. Alternative strategies, including threshold-based switching (accuracy of 87.39\%) and group-based selection (accuracy improved marginally from 87.46\% to 87.82\%), were explored but did not outperform the simple ensemble.
+
+\subsection{LLM Experimentation}
+We initially tested large language models using OpenAI’s GPT-4 API to assess their potential for language labeling. Although the API demonstrated strong performance, local tests with models like DeepSeek R1 Distilled Qwen 1.5B, Qwen 2.5 1.5B, and Aya-101 were not competitive in terms of speed, language coverage, or accuracy. Given these limitations and competition constraints on external API usage, we did not incorporate LLMs into our final pipeline.
+
+\subsection{Overall Findings}
+The experiments highlight that:
+\begin{itemize}
+    \item The n-gram filtering mechanism effectively reduces false positives with minimal impact on true labels.
+    \item Averaging DistilBERT and FastText probability distributions, together with filtering, yields the highest accuracy (88.5\%).
+    \item Alternative ensemble strategies offer only marginal improvements and add complexity.
+    \item While LLM-based labeling shows promise, its practical limitations render it unsuitable for our efficient, open-source solution.
+\end{itemize}
+
+\section{Conclusion}
+Our hybrid approach, combining deep contextual modeling with robust statistical techniques and an innovative n-gram filtering mechanism, has proven effective for automatic language identification. The final ensemble achieves 88.5\% accuracy and demonstrates robustness against noisy and ambiguous inputs. Future work may investigate adaptive thresholding or the integration of additional linguistic features to further enhance performance.
+
+\subsection{References}
+
+\nocite{joulin2017bag,sanh2019distilbert,bojanowski2017enriching,he2021deberta,banon2024fastspell,windisch2023glotlid,ustun2024aya}
+
+% Entries for the entire Anthology, followed by custom entries
+\bibliography{custom}
+\bibliographystyle{acl_natbib}
+
+\end{document}
